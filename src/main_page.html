@@ -5,7 +5,6 @@
 
 <!DOCTYPE HTML>
 <html>
-
 <head>
     <meta name="theme-color" content="#00878f">
     <meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport'>
@@ -17,20 +16,23 @@
         body {
             background-color: rgb(0, 0, 0);
             text-align: center;
-            padding: 5px 0 0 0;
-            height: 80%;
+            padding: 0;
+            margin: 0;
+            height: 100%;
         }
         
-        fieldset {
-            -border: none;
-            height: 30%;
+        .fieldset {
+            flex: 1;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         input[type=range] {
             width: 80%;
             -webkit-appearance: none;
             background: transparent;
-            margin-top: 40px;
             border: 1px solid red;
         }
         
@@ -45,10 +47,13 @@
             box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
             border-radius: 1.3px;
             border: 0.2px solid #010101;
-            padding-top: -3em;
         }
         
         input#g::-webkit-slider-runnable-track {
+            background: rgb(98, 194, 42);
+        }
+
+        input#g::-webkit-slider-thumb {
             background: rgb(98, 194, 42);
         }
         
@@ -56,12 +61,17 @@
             background: #c92626;
         }
         
+        input#r::-webkit-slider-thumb {
+            background: #d92626;
+        }
+        
         input#b::-webkit-slider-runnable-track {
             background: #3071a9;
         }
+
         
-        input#r::-webkit-slider-thumb {
-            background: #d92626;
+        input#b::-webkit-slider-thumb {
+            background: #3071a9;
         }
         
         input[type=range]::-webkit-slider-thumb {
@@ -73,32 +83,42 @@
             background: #ffffff;
             cursor: pointer;
             -webkit-appearance: none;
-            margin-top: -20px;
         }
         
         input[type=range]:focus::-webkit-slider-runnable-track {
             background: #367ebd;
         }
+
+        input::-webkit-slider-thumb {
+            margin-top: -3em;
+        }
+
+        .fieldset-wrapper {
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            padding: 30px;
+        }
+
     </style>
-
-    <script type='text/javascript'>
-    </script>
-
 </head>
 
 <body>
-    <fieldset>
-        <input type='range' min='0' max='255' id='r' step='1' value='0'>
-    </fieldset>
-
-    <fieldset>
-        <input type='range' min='0' max='255' id='g' step='1' value='0'>
-    </fieldset>
-
-    <fieldset>
-        <input type='range' min='0' max='255' id='b' step='1' value='0'>
-    </fieldset>
-
+    <div class="fieldset-wrapper">
+        <div class="fieldset">
+            <input type='range' min='0' max='255' id='r' step='1' value='0'>
+        </div>
+    
+        <div class="fieldset">
+            <input type='range' min='0' max='255' id='g' step='1' value='0'>
+        </div>
+    
+        <div class="fieldset">
+            <input type='range' min='0' max='255' id='b' step='1' value='0'>
+        </div>
+    </div>
     <script>
         let body, r, g, b;
         let connection;
@@ -106,13 +126,15 @@
         function sendRGB(rgbstr) {
             if (connection) {
                 connection.send(rgbstr);
-            } else {
-                console.log("No ws connection");
+                console.log(`sent: {$rgbstr}`);
+            }
+            else {
+              console.log("No ws connection");
             }
         }
 
         function setColor() {
-            const r_hex = parseInt(r.value, 10).toString(16),
+            var r_hex = parseInt(r.value, 10).toString(16),
                 g_hex = parseInt(g.value, 10).toString(16),
                 b_hex = parseInt(b.value, 10).toString(16),
                 hex = '#' + pad(r_hex) + pad(g_hex) + pad(b_hex);
@@ -126,9 +148,9 @@
 
         (function() {
             body = document.body;
-            r = body.querySelector('#r');
-            g = body.querySelector('#g');
-            b = body.querySelector('#b');
+            r = document.querySelector('#r');
+            g = document.querySelector('#g');
+            b = document.querySelector('#b');
 
             r.addEventListener('change', function() {
                 setColor();
@@ -154,22 +176,12 @@
                 setColor();
             }, false);
 
-            connection = new WebSocket('ws://' + location.hostname + ':81/', ['arduino']);
-            if (connection) {
-                connection.onopen = function() {
-                    connection.send('Connect ' + new Date());
-                    connection.send('#123456');
-                };
-                connection.onerror = function(error) {
-                    console.log('WebSocket Error ', error);
-                };
-                connection.onmessage = function(e) {
-                    console.log('Server: ', e.data);
-                };
-                connection.onclose = function() {
-                    console.log('WebSocket connection closed');
-                };
-            }
+            connection = new WebSocket('ws://' + location.hostname + ':81/');  
+            connection.onopen = function(evt) { setColor('#123456'); console.log(evt) };
+            connection.onclose = function(evt) { console.log(evt) };
+            connection.onmessage = function(evt) { console.log(evt) };
+            connection.onerror = function(evt) { console.log(evt) };      
+            
         })();
     </script>
 

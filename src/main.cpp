@@ -77,7 +77,7 @@ void setup()
   display_init();
 
   display_set_color(50, 50, 50);
-  Serial.print("Setting soft-AP ... ");
+  Serial.print("\n\nSetting soft-AP ... ");
   boolean result = WiFi.softAP("ESPsoftAP_01", "12345678");
   if (result)
   {
