@@ -17,6 +17,7 @@ WebSocketsServer webSocket(81);
 void handleRoot()
 {
   Serial.printf("Main page req, [%u] bytes\n", strlen(html_page));
+  Serial.printf("404: %s\n", server.uri().c_str());
   server.send(200, "text/html", html_page);
 
   String message = "Headers: ";
@@ -32,7 +33,7 @@ void handleRoot()
 
 void handleNotFound()
 {
-  Serial.println("404");
+  Serial.printf("404: %s\n", server.uri().c_str());
   server.send(404, "text/plain", "404: Not found"); 
 }
 
@@ -77,8 +78,22 @@ void setup()
   display_init();
 
   display_set_color(50, 50, 50);
-  Serial.print("\n\nSetting soft-AP ... ");
-  boolean result = WiFi.softAP("ESPsoftAP_01", "12345678");
+  //Serial.print("\n\nSetting soft-AP ... ");
+  //boolean result = WiFi.softAP("ESPsoftAP_01", "12345678");
+  //Serial.print("Setting soft-AP ... ");
+  boolean result = true;  //WiFi.softAP("ESPsoftAP_01", "12345678");
+
+  WiFi.begin("", "");    
+  while (WiFi.status() != WL_CONNECTED) { // Wait for the Wi-Fi to connect
+    delay(500);
+    Serial.print('.');
+  }
+
+  Serial.println('\n');
+  Serial.println("Connection established!");  
+  Serial.print("IP address:\t");
+  Serial.println(WiFi.localIP());  
+
   if (result)
   {
     Serial.println("Ready");
