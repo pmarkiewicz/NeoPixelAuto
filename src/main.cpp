@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <DNSServer.h> //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>
@@ -15,10 +14,13 @@
 #include "html_inside/html_end.pp"   // header from this repo
 
 /************ WIFI and MQTT Information (CHANGE THESE FOR YOUR SETUP) ******************/
-const char *mqtt_server = "your.MQTT.server.ip";
+//const char *mqtt_server = "your.MQTT.server.ip";
 const char *mqtt_username = "yourMQTTusername";
 const char *mqtt_password = "yourMQTTpassword";
-const int mqtt_port = 1883;
+//const int mqtt_port = 1883;
+
+char mqtt_server[40];
+char mqtt_port[6] = "1883";
 
 /************* MQTT TOPICS (change these topics as you wish)  **************************/
 const char *light_state_topic = "hs/neopixel";
@@ -118,21 +120,43 @@ void mqttReconnect()
   }
 }
 
+//flag for saving data
+bool shouldSaveConfig = false;
+
+//callback notifying us of the need to save config
+void saveConfigCallback()
+{
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
+
 void startWiFi()
-{ // Try to connect to some given access points. Then wait for a connection
+{
+  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, sizeof(mqtt_server));
+  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, sizeof(mqtt_port));
   WiFiManager wifiManager;
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+  wifiManager.addParameter(&custom_mqtt_server);
+  wifiManager.addParameter(&custom_mqtt_port);
+  wifiManager.setConfigPortalTimeout(120);
+  wifiManager.setTimeout(20);
 
-  // Uncomment and run it once, if you want to erase all the stored information
-  //wifiManager.resetSettings();
+  if (!wifiManager.autoConnect("neopixel"))
+  {
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
 
-  wifiManager.autoConnect("neopixel");
-
-  Serial.println("WiFi connected");
+  Serial.println("Connected to Wifi");
+  strcpy(mqtt_server, custom_mqtt_server.getValue());
+  strcpy(mqtt_port, custom_mqtt_port.getValue());
 }
 
 void startMQTT()
 {
-  mqttClient.setServer(mqtt_server, mqtt_port);
+  mqttClient.setServer(mqtt_server, atoi(mqtt_port));
   mqttClient.setCallback(mqttCallback);
 }
 
@@ -216,6 +240,13 @@ void setup()
 
 void loop()
 {
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    startWiFi();
+
+    return;
+  }
+
   server.handleClient();
   //MDNS.update();
   webSocket.loop();
