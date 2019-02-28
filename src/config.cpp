@@ -20,10 +20,10 @@ static void load_from_file(File &configFile)
   {
     Serial.println("\nparsed json");
 
-    strcpy(config.mqtt_server, json["mqtt_server"]);
-    strcpy(config.mqtt_port, json["mqtt_port"]);
-    strcpy(config.mqtt_username, json["mqtt_username"]);
-    strcpy(config.mqtt_password, json["mqtt_password"]);
+    strlcpy(config.mqtt_server, json["mqtt_server"] | "", sizeof(config.mqtt_server));
+    strlcpy(config.mqtt_port, json["mqtt_port"] | "", sizeof(config.mqtt_port));
+    strlcpy(config.mqtt_username, json["mqtt_username"] | "", sizeof(config.mqtt_username));
+    strlcpy(config.mqtt_password, json["mqtt_password"] | "", sizeof(config.mqtt_password));
   }
   else
   {
