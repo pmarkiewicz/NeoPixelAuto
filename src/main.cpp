@@ -129,7 +129,9 @@ void startWiFi()
   WiFiManagerParameter custom_mqtt_port("port", "mqtt port", config.mqtt_port, sizeof(config.mqtt_port));
   WiFiManagerParameter mqtt_username("username", "mqtt username", config.mqtt_username, sizeof(config.mqtt_username));
   WiFiManagerParameter mqtt_password("pwd", "mqtt pwd", config.mqtt_password, sizeof(config.mqtt_password));
+
   WiFiManager wifiManager;
+
   wifiManager.setSaveConfigCallback(saveConfigCallback);
   wifiManager.addParameter(&custom_mqtt_server);
   wifiManager.addParameter(&custom_mqtt_port);
@@ -147,13 +149,20 @@ void startWiFi()
   }
 
   Serial.println("Connected to Wifi");
-  strcpy(config.mqtt_server, custom_mqtt_server.getValue());
-  strcpy(config.mqtt_port, custom_mqtt_port.getValue());
+  strlcpy(config.mqtt_server, custom_mqtt_server.getValue(), sizeof(config.mqtt_server));
+  strlcpy(config.mqtt_port, custom_mqtt_port.getValue(), sizeof(config.mqtt_port));
+}
+
+bool isMQTTConfigured() 
+{
+  return config.mqtt_server && config.mqtt_port &&
+         strlen(config.mqtt_server) > 0 &&
+         strlen(config.mqtt_port) > 0;
 }
 
 void startMQTT()
 {
-  if (strlen(config.mqtt_server) > 0 && strlen(config.mqtt_port) > 0)
+  if (isMQTTConfigured())
   {
     mqttClient.setServer(config.mqtt_server, atoi(config.mqtt_port));
     mqttClient.setCallback(mqttCallback);
