@@ -3,6 +3,8 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <WebSocketsServer.h>
+#include <WiFiManager.h>      
+#include <ArduinoOTA.h>
 
 #include "display.h"
 
@@ -19,22 +21,25 @@ void handleRoot()
   Serial.printf("Main page req, [%u] bytes\n", strlen(html_page));
   Serial.printf("404: %s\n", server.uri().c_str());
   server.send(200, "text/html", html_page);
-
-  String message = "Headers: ";
-  message += server.headers();
-  message += "\n";
-
-  for (uint8_t i = 0; i < server.headers(); i++) {
-    message += " " + server.headerName(i) + ": " + server.header(i) + "\n";
-  }
-
-  Serial.print(message);
 }
 
 void handleNotFound()
 {
-  Serial.printf("404: %s\n", server.uri().c_str());
-  server.send(404, "text/plain", "404: Not found"); 
+  server.send(404, "text/plain", "404: Not found");
+}
+
+void handleWSText(uint8_t num, uint8_t *payload)
+{
+  Serial.printf("[%u] get Text: %s\n", num, payload);
+  if (payload[0] == '#')
+  {                                                                       // we get RGB data
+    uint32_t rgb = (uint32_t)strtol((const char *)&payload[1], NULL, 16); // decode rgb data
+    int r = ((rgb >> 20) & 0x3FF);                                        // 10 bits per color, so R: bits 20-29
+    int g = ((rgb >> 10) & 0x3FF);                                        // G: bits 10-19
+    int b = rgb & 0x3FF;                                                  // B: bits  0-9
+
+    display_set_color(r, g, b);
+  }
 }
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
@@ -55,70 +60,100 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
   }
   break;
   case WStype_TEXT: // if new text data is received
-    Serial.printf("[%u] get Text: %s\n", num, payload);
-    if (payload[0] == '#')
-    {                                                                       // we get RGB data
-      uint32_t rgb = (uint32_t)strtol((const char *)&payload[1], NULL, 16); // decode rgb data
-      int r = ((rgb >> 20) & 0x3FF);                                        // 10 bits per color, so R: bits 20-29
-      int g = ((rgb >> 10) & 0x3FF);                                        // G: bits 10-19
-      int b = rgb & 0x3FF;                                                  // B: bits  0-9
-
-      display_set_color(r, g, b);
-    }
+    handleWSText(num, payload);
     break;
-    default:
-      Serial.printf("Unknown WS command\n");
-      break;
+  default:
+    Serial.printf("Unknown WS command\n");
+    break;
   }
+}
+
+void startWiFi() { // Try to connect to some given access points. Then wait for a connection
+  WiFiManager wifiManager;
+
+  // Uncomment and run it once, if you want to erase all the stored information
+  //wifiManager.resetSettings();
+
+  wifiManager.autoConnect("neopixel");
+
+  Serial.println("WiFi connected");
+}
+
+void startOTA() {
+  ArduinoOTA.setHostname("neopixel");
+  ArduinoOTA.setPassword("esp8266");
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+    display_yellow();
+  });
+
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+    display_off();
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    display_yellow();
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    display_red();
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+
+  ArduinoOTA.begin();
+}
+
+void startServer()
+{
+  server.on("/", HTTP_GET, handleRoot);
+  server.onNotFound(handleNotFound);
+  server.begin();
+}
+
+void startWebsocket()
+{
+  webSocket.begin();                 // start the websocket server
+  webSocket.onEvent(webSocketEvent); // if there's an incomming websocket message, go to function 'webSocketEvent'
+}
+
+void startMDNS()
+{
+  MDNS.begin("neopixel");
+}
+
+void startLED()
+{
+  display_init();
+
+  display_off();
 }
 
 void setup()
 {
   Serial.begin(115200);
-  display_init();
+  delay(10);
 
-  display_set_color(50, 50, 50);
-  //Serial.print("\n\nSetting soft-AP ... ");
-  //boolean result = WiFi.softAP("ESPsoftAP_01", "12345678");
-  //Serial.print("Setting soft-AP ... ");
-  boolean result = true;  //WiFi.softAP("ESPsoftAP_01", "12345678");
+  startLED();
 
-  WiFi.begin("", "");    
-  while (WiFi.status() != WL_CONNECTED) { // Wait for the Wi-Fi to connect
-    delay(500);
-    Serial.print('.');
-  }
+  startWiFi();
+  startOTA();
 
-  Serial.println('\n');
-  Serial.println("Connection established!");  
-  Serial.print("IP address:\t");
-  Serial.println(WiFi.localIP());  
-
-  if (result)
-  {
-    Serial.println("Ready");
-    display_set_color(10, 128, 10);
-
-    server.on("/", HTTP_GET, handleRoot);
-    server.onNotFound(handleNotFound); 
-    server.begin();
-
-    MDNS.begin("esp8266");
-    webSocket.begin();                          // start the websocket server
-    webSocket.onEvent(webSocketEvent);          // if there's an incomming websocket message, go to function 'webSocketEvent'
-
-    Serial.println("WebSocket server started.");
-  }
-  else
-  {
-    Serial.println("Failed!");
-    display_set_color(128, 10, 10);
-  }
+  startServer();
+  startWebsocket();
+  //startMDNS();
 }
 
 void loop()
 {
   server.handleClient();
-  MDNS.update();
+  //MDNS.update();
   webSocket.loop();
 }
