@@ -8,19 +8,11 @@
 #include <PubSubClient.h>
 
 #include "display.h"
+#include "config.h"
 
 #include "html_inside/html_begin.pp" // header from this repo
 #include "main_page.html"            // your HTML file
 #include "html_inside/html_end.pp"   // header from this repo
-
-/************ WIFI and MQTT Information (CHANGE THESE FOR YOUR SETUP) ******************/
-//const char *mqtt_server = "your.MQTT.server.ip";
-const char *mqtt_username = "yourMQTTusername";
-const char *mqtt_password = "yourMQTTpassword";
-//const int mqtt_port = 1883;
-
-char mqtt_server[40];
-char mqtt_port[6] = "1883";
 
 /************* MQTT TOPICS (change these topics as you wish)  **************************/
 const char *light_state_topic = "hs/neopixel";
@@ -34,6 +26,7 @@ WiFiClient wifi;
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
 PubSubClient mqttClient(wifi);
+bool mqttInUse = false;
 
 void handleRoot()
 {
@@ -132,12 +125,16 @@ void saveConfigCallback()
 
 void startWiFi()
 {
-  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, sizeof(mqtt_server));
-  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, sizeof(mqtt_port));
+  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", config.mqtt_server, sizeof(config.mqtt_server));
+  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", config.mqtt_port, sizeof(config.mqtt_port));
+  WiFiManagerParameter mqtt_username("username", "mqtt username", config.mqtt_username, sizeof(config.mqtt_username));
+  WiFiManagerParameter mqtt_password("pwd", "mqtt pwd", config.mqtt_password, sizeof(config.mqtt_password));
   WiFiManager wifiManager;
   wifiManager.setSaveConfigCallback(saveConfigCallback);
   wifiManager.addParameter(&custom_mqtt_server);
   wifiManager.addParameter(&custom_mqtt_port);
+  wifiManager.addParameter(&mqtt_username);
+  wifiManager.addParameter(&mqtt_password);
   wifiManager.setConfigPortalTimeout(120);
   wifiManager.setTimeout(20);
 
@@ -150,14 +147,19 @@ void startWiFi()
   }
 
   Serial.println("Connected to Wifi");
-  strcpy(mqtt_server, custom_mqtt_server.getValue());
-  strcpy(mqtt_port, custom_mqtt_port.getValue());
+  strcpy(config.mqtt_server, custom_mqtt_server.getValue());
+  strcpy(config.mqtt_port, custom_mqtt_port.getValue());
 }
 
 void startMQTT()
 {
-  mqttClient.setServer(mqtt_server, atoi(mqtt_port));
-  mqttClient.setCallback(mqttCallback);
+  if (strlen(config.mqtt_server) > 0 && strlen(config.mqtt_port) > 0)
+  {
+    mqttClient.setServer(config.mqtt_server, atoi(config.mqtt_port));
+    mqttClient.setCallback(mqttCallback);
+
+    mqttInUse = true;
+  }
 }
 
 void startOTA()
@@ -235,7 +237,7 @@ void setup()
 
   startServer();
   startWebsocket();
-  //startMDNS();
+  startMDNS();
 }
 
 void loop()
@@ -248,11 +250,14 @@ void loop()
   }
 
   server.handleClient();
-  //MDNS.update();
+  MDNS.update();
   webSocket.loop();
-  if (!mqttClient.connected())
+  if (mqttInUse)
   {
-    mqttReconnect();
+    if (!mqttClient.connected())
+    {
+      mqttReconnect();
+    }
+    mqttClient.loop();
   }
-  mqttClient.loop();
 }
