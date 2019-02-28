@@ -1,11 +1,12 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
+#include <DNSServer.h> //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <WebSocketsServer.h>
-#include <WiFiManager.h>      
+#include <WiFiManager.h>
 #include <ArduinoOTA.h>
+#include <PubSubClient.h>
 
 #include "display.h"
 
@@ -13,9 +14,24 @@
 #include "main_page.html"            // your HTML file
 #include "html_inside/html_end.pp"   // header from this repo
 
+/************ WIFI and MQTT Information (CHANGE THESE FOR YOUR SETUP) ******************/
+const char *mqtt_server = "your.MQTT.server.ip";
+const char *mqtt_username = "yourMQTTusername";
+const char *mqtt_password = "yourMQTTpassword";
+const int mqtt_port = 1883;
+
+/************* MQTT TOPICS (change these topics as you wish)  **************************/
+const char *light_state_topic = "hs/neopixel";
+const char *light_set_topic = "hs/neopixel/set";
+
+const char *on_cmd = "ON";
+const char *off_cmd = "OFF";
+const char *color = "color";
+
 WiFiClient wifi;
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
+PubSubClient mqttClient(wifi);
 
 void handleRoot()
 {
@@ -69,7 +85,41 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
   }
 }
 
-void startWiFi() { // Try to connect to some given access points. Then wait for a connection
+void mqttCallback(char *topic, byte *payload, unsigned int length)
+{
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+}
+
+void mqttReconnect()
+{
+  // Loop until we're reconnected
+  while (!mqttClient.connected())
+  {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (mqttClient.connect("ESP8266Client"))
+    {
+      Serial.println("connected");
+      // Once connected, publish an announcement...
+      mqttClient.publish(light_state_topic, "hello world");
+      // ... and resubscribe
+      mqttClient.subscribe(light_state_topic);
+    }
+    else
+    {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+void startWiFi()
+{ // Try to connect to some given access points. Then wait for a connection
   WiFiManager wifiManager;
 
   // Uncomment and run it once, if you want to erase all the stored information
@@ -80,7 +130,14 @@ void startWiFi() { // Try to connect to some given access points. Then wait for 
   Serial.println("WiFi connected");
 }
 
-void startOTA() {
+void startMQTT()
+{
+  mqttClient.setServer(mqtt_server, mqtt_port);
+  mqttClient.setCallback(mqttCallback);
+}
+
+void startOTA()
+{
   ArduinoOTA.setHostname("neopixel");
   ArduinoOTA.setPassword("esp8266");
 
@@ -102,11 +159,16 @@ void startOTA() {
   ArduinoOTA.onError([](ota_error_t error) {
     display_red();
     Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    if (error == OTA_AUTH_ERROR)
+      Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR)
+      Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR)
+      Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR)
+      Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR)
+      Serial.println("End Failed");
   });
 
   ArduinoOTA.begin();
@@ -157,4 +219,9 @@ void loop()
   server.handleClient();
   //MDNS.update();
   webSocket.loop();
+  if (!mqttClient.connected())
+  {
+    mqttReconnect();
+  }
+  mqttClient.loop();
 }

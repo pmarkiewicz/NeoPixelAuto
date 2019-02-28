@@ -8,7 +8,6 @@
 
 const uint16_t PixelCount = 8;
 const uint8_t PixelPin = 14; // ignored
-const RgbColor color(255, 0, 0);
 
 NeoPixelBrightnessBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
 
