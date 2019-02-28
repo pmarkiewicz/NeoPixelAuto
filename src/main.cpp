@@ -157,6 +157,7 @@ void startMQTT()
   {
     mqttClient.setServer(config.mqtt_server, atoi(config.mqtt_port));
     mqttClient.setCallback(mqttCallback);
+    mqttClient.connect("neopixel", config.mqtt_username, config.mqtt_password);
 
     mqttInUse = true;
   }
@@ -252,6 +253,7 @@ void loop()
   server.handleClient();
   MDNS.update();
   webSocket.loop();
+  
   if (mqttInUse)
   {
     if (!mqttClient.connected())
