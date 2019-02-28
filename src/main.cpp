@@ -59,10 +59,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
     if (payload[0] == '#')
     {                                                                       // we get RGB data
       uint32_t rgb = (uint32_t)strtol((const char *)&payload[1], NULL, 16); // decode rgb data
-      int r = ((rgb >> 20) & 0x3FF);                                        // 10 bits per color, so R: bits 20-29
-      int g = ((rgb >> 10) & 0x3FF);                                        // G: bits 10-19
-      int b = rgb & 0x3FF;                                                  // B: bits  0-9
+      int r = ((rgb >> 16) & 0xFF);                                        // 10 bits per color, so R: bits 20-29
+      int g = ((rgb >> 8) & 0xFF);                                        // G: bits 10-19
+      int b = rgb & 0xFF;                                                  // B: bits  0-9
 
+      Serial.printf("rgb: [%X] r [%u] g [%u] b [%u]\n", rgb, r, g, b);
       display_set_color(r, g, b);
     }
     break;
@@ -77,13 +78,11 @@ void setup()
   Serial.begin(115200);
   display_init();
 
-  display_set_color(50, 50, 50);
-  //Serial.print("\n\nSetting soft-AP ... ");
-  //boolean result = WiFi.softAP("ESPsoftAP_01", "12345678");
+  //display_set_color(50, 50, 50);
   //Serial.print("Setting soft-AP ... ");
   boolean result = true;  //WiFi.softAP("ESPsoftAP_01", "12345678");
 
-  WiFi.begin("", "");    
+  WiFi.begin("coda", "olaola123");    
   while (WiFi.status() != WL_CONNECTED) { // Wait for the Wi-Fi to connect
     delay(500);
     Serial.print('.');
