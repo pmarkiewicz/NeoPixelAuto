@@ -7,9 +7,8 @@
 #pragma GCC diagnostic pop
 
 const uint16_t PixelCount = 8;
-const uint8_t PixelPin = 14; // ignored
 
-NeoPixelBrightnessBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
+NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount);
 
 void display_init()
 {
