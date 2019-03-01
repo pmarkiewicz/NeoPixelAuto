@@ -5,6 +5,7 @@
 
 <!DOCTYPE HTML>
 <html>
+
 <head>
     <meta name="theme-color" content="#00878f">
     <meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport'>
@@ -12,7 +13,7 @@
         html {
             height: 100%;
         }
-        
+
         body {
             background-color: rgb(0, 0, 0);
             text-align: center;
@@ -20,7 +21,7 @@
             margin: 0;
             height: 100%;
         }
-        
+
         .fieldset {
             flex: 1;
             padding: 15px;
@@ -28,27 +29,42 @@
             align-items: center;
             justify-content: center;
         }
-        
+
+        button {
+            width: 10%;
+            height: 5em;
+            margin-right: 1em;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+            background: lightgrey;
+            font-size: large;
+            color: rgb(8, 5, 167);
+        }
+
+        button:hover {
+            background: rgb(5, 98, 173);
+            color: rgb(82, 81, 139);
+        }
+
         input[type=range] {
             width: 80%;
             -webkit-appearance: none;
             background: transparent;
-            border: 1px solid red;
+            border: none;
         }
-        
+
         input[type=range]:focus {
             outline: none;
         }
-        
+
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
             height: 2em;
             cursor: pointer;
-            box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
-            border-radius: 1.3px;
-            border: 0.2px solid #010101;
+            border: none;
         }
-        
+
         input#g::-webkit-slider-runnable-track {
             background: rgb(98, 194, 42);
         }
@@ -56,41 +72,33 @@
         input#g::-webkit-slider-thumb {
             background: rgb(98, 194, 42);
         }
-        
+
         input#r::-webkit-slider-runnable-track {
             background: #c92626;
         }
-        
+
         input#r::-webkit-slider-thumb {
             background: #d92626;
         }
-        
+
         input#b::-webkit-slider-runnable-track {
             background: #3071a9;
         }
 
-        
         input#b::-webkit-slider-thumb {
             background: #3071a9;
         }
-        
+
         input[type=range]::-webkit-slider-thumb {
+            margin-top: -3em;
             box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
             border: 2px 2px 2px 1px solid #000000;
-            height: 8em;
+            height: 400%;
             width: 10%;
             border-radius: 3px;
             background: #ffffff;
             cursor: pointer;
             -webkit-appearance: none;
-        }
-        
-        input[type=range]:focus::-webkit-slider-runnable-track {
-            background: #367ebd;
-        }
-
-        input::-webkit-slider-thumb {
-            margin-top: -3em;
         }
 
         .fieldset-wrapper {
@@ -101,26 +109,28 @@
             height: 100%;
             padding: 30px;
         }
-
     </style>
 </head>
 
 <body>
     <div class="fieldset-wrapper">
         <div class="fieldset">
+            <button id='off'>Off</button>
             <input type='range' min='0' max='255' id='r' step='1' value='0'>
         </div>
-    
+
         <div class="fieldset">
+            <button id='half_on'>50%</button>
             <input type='range' min='0' max='255' id='g' step='1' value='0'>
         </div>
-    
+
         <div class="fieldset">
+            <button id='full_on'>100%</button>
             <input type='range' min='0' max='255' id='b' step='1' value='0'>
         </div>
     </div>
     <script>
-        let body, r, g, b;
+        let body, r, g, b, off, full_on, half_on;
         let connection;
 
         function sendRGB(rgbstr) {
@@ -129,7 +139,7 @@
                 console.log(`sent: {$rgbstr}`);
             }
             else {
-              console.log("No ws connection");
+                console.log("No ws connection");
             }
         }
 
@@ -146,45 +156,41 @@
             return (n.length < 2) ? '0' + n : n;
         }
 
-        (function() {
+        const setValues = (val) => {
+            r.value = g.value = b.value = val;
+            setColor();
+        };
+
+        (function () {
             body = document.body;
             r = document.querySelector('#r');
             g = document.querySelector('#g');
             b = document.querySelector('#b');
+            off = document.querySelector('#off');
+            full_on = document.querySelector('#full_on');
+            half_on = document.querySelector('#half_on');
 
-            r.addEventListener('change', function() {
-                setColor();
-            }, false);
+            off.onclick = () => setValues(0);
+            full_on.onclick = () => setValues(255);
+            half_on.onclick = () => setValues(128);
 
-            r.addEventListener('input', function() {
-                setColor();
-            }, false);
+            r.onchange = setColor;
+            g.onchange = setColor;
+            b.onchange = setColor;
 
-            g.addEventListener('change', function() {
-                setColor();
-            }, false);
+            r.addEventListener('input', setColor, false);
+            g.addEventListener('input', setColor, false);
+            b.addEventListener('input', setColor, false);
 
-            g.addEventListener('input', function() {
-                setColor();
-            }, false);
-
-            b.addEventListener('change', function() {
-                setColor();
-            }, false);
-
-            b.addEventListener('input', function() {
-                setColor();
-            }, false);
-
-            connection = new WebSocket('ws://' + location.hostname + ':81/');  
-            connection.onopen = function(evt) { setColor('#123456'); console.log(evt) };
-            connection.onclose = function(evt) { console.log(evt) };
-            connection.onmessage = function(evt) { console.log(evt) };
-            connection.onerror = function(evt) { console.log(evt) };      
-            
+            if (location.hostname) {
+                connection = new WebSocket('ws://' + location.hostname + ':81/');
+                connection.onopen = function (evt) { setColor('#123456'); console.log(evt) };
+                connection.onclose = function (evt) { console.log(evt) };
+                connection.onmessage = function (evt) { console.log(evt) };
+                connection.onerror = function (evt) { console.log(evt) };
+            }
         })();
     </script>
-
 </body>
 
 </html>
