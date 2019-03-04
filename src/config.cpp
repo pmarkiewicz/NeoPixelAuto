@@ -47,6 +47,7 @@ void config_load()
         load_from_file(configFile);
       }
     }
+    SPIFFS.end();
   }
   else
   {
@@ -64,11 +65,12 @@ void save_config()
   json["mqtt_username"] = config.mqtt_username;
   json["mqtt_password"] = config.mqtt_password;
 
+  SPIFFS.begin();
   File configFile = SPIFFS.open("/config.json", "w");
   if (!configFile)
   {
     Serial.println("failed to open config file for writing");
-
+    SPIFFS.end();
     return;
   }
 
@@ -76,4 +78,5 @@ void save_config()
   json.printTo(configFile);
   configFile.close();
   //end save
+  SPIFFS.end();
 }

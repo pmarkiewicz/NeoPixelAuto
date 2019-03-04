@@ -1,3 +1,4 @@
+#include <FS.h> //this needs to be first, or it all crashes and burns...
 #include <ESP8266WiFi.h>
 #include <DNSServer.h> //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>
@@ -10,9 +11,9 @@
 #include "display.h"
 #include "config.h"
 
-#include "html_inside/html_begin.pp" // header from this repo
-#include "main_page.html"            // your HTML file
-#include "html_inside/html_end.pp"   // header from this repo
+//#include "html_inside/html_begin.pp" // header from this repo
+//#include "main_page.html"            // your HTML file
+//#include "html_inside/html_end.pp"   // header from this repo
 
 /************* MQTT TOPICS (change these topics as you wish)  **************************/
 const char *light_state_topic = "hs/neopixel";
@@ -22,6 +23,8 @@ const char *on_cmd = "ON";
 const char *off_cmd = "OFF";
 const char *color = "color";
 
+const char* index_html = "/index.html";
+
 WiFiClient wifi;
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
@@ -30,9 +33,13 @@ bool mqttInUse = false;
 
 void handleRoot()
 {
-  Serial.printf("Main page req, [%u] bytes\n", strlen(html_page));
-  Serial.printf("404: %s\n", server.uri().c_str());
-  server.send(200, "text/html", html_page);
+  SPIFFS.begin();
+
+  File file = SPIFFS.open(index_html, "r");
+  server.streamFile(file, "text/html");
+  file.close();
+
+  SPIFFS.end();
 }
 
 void handleNotFound()
@@ -264,6 +271,7 @@ void loop()
   server.handleClient();
   MDNS.update();
   webSocket.loop();
+  ArduinoOTA.handle();
   
   if (mqttInUse)
   {
