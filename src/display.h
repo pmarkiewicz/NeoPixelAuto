@@ -1,7 +1,7 @@
 #ifndef _DISPLAY__H_
 #define _DISPLAY__H_
 
-void display_init();
+void display_init(uint8_t no_of_leds);
 void display_set_color(uint8_t r, uint8_t g, uint8_t b);
 
 inline void display_red() { display_set_color(128, 0, 0); }

@@ -6,3 +6,5 @@
 .vscode/launch.json
 .vscode/settings.json
 .travis.yml
+src/main_page_v2.html
+src/main_page_old.html

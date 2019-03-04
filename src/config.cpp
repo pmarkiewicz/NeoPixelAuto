@@ -3,7 +3,7 @@
 
 #include "config.h"
 
-config_struct config = {"", "1883", "", ""};
+config_struct config = {"", "1883", "", "", 8};
 
 static void load_from_file(File &configFile)
 {

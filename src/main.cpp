@@ -230,7 +230,7 @@ void startMDNS()
 
 void startLED()
 {
-  display_init();
+  display_init(config.no_of_leds);
 
   display_off();
 }
@@ -239,6 +239,8 @@ void setup()
 {
   Serial.begin(115200);
   delay(10);
+
+  config_load();
 
   startLED();
 
