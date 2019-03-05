@@ -25,6 +25,8 @@ const char *color = "color";
 
 const char* index_html = "/index.html";
 
+const char* hostname = "neopixel";
+
 WiFiClient wifi;
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
@@ -132,22 +134,30 @@ void saveConfigCallback()
 
 void startWiFi()
 {
+  char no_of_leds[4]; // max uint8
+  char mqtt_port[6];  // max uint16
+
+  itoa(config.no_of_leds, no_of_leds, 10);
+  itoa(config.mqtt_port, mqtt_port, 10);
+
   WiFiManagerParameter custom_mqtt_server("server", "mqtt server", config.mqtt_server, sizeof(config.mqtt_server));
-  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", config.mqtt_port, sizeof(config.mqtt_port));
-  WiFiManagerParameter mqtt_username("username", "mqtt username", config.mqtt_username, sizeof(config.mqtt_username));
-  WiFiManagerParameter mqtt_password("pwd", "mqtt pwd", config.mqtt_password, sizeof(config.mqtt_password));
+  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, sizeof(mqtt_port));
+  WiFiManagerParameter custom_mqtt_username("username", "mqtt username", config.mqtt_username, sizeof(config.mqtt_username));
+  WiFiManagerParameter custom_mqtt_password("pwd", "mqtt pwd", config.mqtt_password, sizeof(config.mqtt_password));
+  WiFiManagerParameter custom_no_of_leds("leds", "no of leds", no_of_leds, sizeof(no_of_leds));
 
   WiFiManager wifiManager;
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
   wifiManager.addParameter(&custom_mqtt_server);
   wifiManager.addParameter(&custom_mqtt_port);
-  wifiManager.addParameter(&mqtt_username);
-  wifiManager.addParameter(&mqtt_password);
+  wifiManager.addParameter(&custom_mqtt_username);
+  wifiManager.addParameter(&custom_mqtt_password);
+  wifiManager.addParameter(&custom_no_of_leds);
   wifiManager.setConfigPortalTimeout(120);
   wifiManager.setTimeout(20);
 
-  if (!wifiManager.autoConnect("neopixel"))
+  if (!wifiManager.autoConnect(hostname))
   {
     delay(3000);
     //reset and try again, or maybe put it to deep sleep
@@ -157,21 +167,23 @@ void startWiFi()
 
   Serial.println("Connected to Wifi");
   strlcpy(config.mqtt_server, custom_mqtt_server.getValue(), sizeof(config.mqtt_server));
-  strlcpy(config.mqtt_port, custom_mqtt_port.getValue(), sizeof(config.mqtt_port));
+  strlcpy(config.mqtt_server, custom_mqtt_server.getValue(), sizeof(config.mqtt_server));
+  strlcpy(config.mqtt_username, custom_mqtt_username.getValue(), sizeof(config.mqtt_username));
+  
+  config.mqtt_port = (uint16_t)atoi(custom_mqtt_port.getValue());
+  config.no_of_leds = (uint8_t)atoi(custom_no_of_leds.getValue());
 }
 
 bool isMQTTConfigured() 
 {
-  return config.mqtt_server && config.mqtt_port &&
-         strlen(config.mqtt_server) > 0 &&
-         strlen(config.mqtt_port) > 0;
+  return config.mqtt_server && strlen(config.mqtt_server) > 0;
 }
 
 void startMQTT()
 {
   if (isMQTTConfigured())
   {
-    mqttClient.setServer(config.mqtt_server, atoi(config.mqtt_port));
+    mqttClient.setServer(config.mqtt_server, config.mqtt_port);
     mqttClient.setCallback(mqttCallback);
     mqttClient.connect("neopixel", config.mqtt_username, config.mqtt_password);
 
@@ -181,7 +193,7 @@ void startMQTT()
 
 void startOTA()
 {
-  ArduinoOTA.setHostname("neopixel");
+  ArduinoOTA.setHostname(hostname);
   ArduinoOTA.setPassword("esp8266");
 
   ArduinoOTA.onStart([]() {
@@ -232,7 +244,7 @@ void startWebsocket()
 
 void startMDNS()
 {
-  MDNS.begin("neopixel");
+  MDNS.begin(hostname);
 }
 
 void startLED()

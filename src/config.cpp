@@ -3,7 +3,7 @@
 
 #include "config.h"
 
-config_struct config = {"", "1883", "", "", 8};
+config_struct config = {"", 1883, "", "", 8};
 
 static void load_from_file(File &configFile)
 {
@@ -21,9 +21,10 @@ static void load_from_file(File &configFile)
     Serial.println("\nparsed json");
 
     strlcpy(config.mqtt_server, json["mqtt_server"] | "", sizeof(config.mqtt_server));
-    strlcpy(config.mqtt_port, json["mqtt_port"] | "", sizeof(config.mqtt_port));
+    config.mqtt_port = (uint16_t)atoi(json["mqtt_port"]);
     strlcpy(config.mqtt_username, json["mqtt_username"] | "", sizeof(config.mqtt_username));
     strlcpy(config.mqtt_password, json["mqtt_password"] | "", sizeof(config.mqtt_password));
+    config.no_of_leds = (uint8_t)atoi(json["no_of_ledss"]);
   }
   else
   {
@@ -57,13 +58,20 @@ void config_load()
 
 void save_config()
 {
+  char no_of_leds[4]; // max uint8
+  char mqtt_port[6];  // max uint16
+
+  itoa(config.no_of_leds, no_of_leds, 10);
+  itoa(config.mqtt_port, mqtt_port, 10);
+
   Serial.println("saving config");
   DynamicJsonBuffer jsonBuffer;
   JsonObject &json = jsonBuffer.createObject();
   json["mqtt_server"] = config.mqtt_server;
-  json["mqtt_port"] = config.mqtt_port;
+  json["mqtt_port"] = mqtt_port;
   json["mqtt_username"] = config.mqtt_username;
   json["mqtt_password"] = config.mqtt_password;
+  json["no_of_leds"] = no_of_leds;
 
   SPIFFS.begin();
   File configFile = SPIFFS.open("/config.json", "w");
