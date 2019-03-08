@@ -10,7 +10,7 @@ const uint16_t PixelCount = 8;
 
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount);
 
-void display_init(uint8_t /*no_of_leds*/)
+void display_init()
 {
   strip.Begin();
 

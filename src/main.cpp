@@ -2,18 +2,17 @@
 #include <ESP8266WiFi.h>
 #include <DNSServer.h> //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
 #include <WebSocketsServer.h>
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
 
 #include "display.h"
-#include "config.h"
 
-//#include "html_inside/html_begin.pp" // header from this repo
-//#include "main_page.html"            // your HTML file
-//#include "html_inside/html_end.pp"   // header from this repo
+const char* mqtt_server = "";
+const int mqtt_port = 1883;
+const char* mqtt_username = NULL;
+const char* mqtt_password = NULL;
 
 /************* MQTT TOPICS (change these topics as you wish)  **************************/
 const char *light_state_topic = "hs/neopixel";
@@ -24,8 +23,10 @@ const char *off_cmd = "OFF";
 const char *color = "color";
 
 const char* index_html = "/index.html";
+const char* favico = "/favicon.ico";
 
 const char* hostname = "neopixel";
+const char* ota_pwd ="esp8266";
 
 WiFiClient wifi;
 ESP8266WebServer server(80);
@@ -39,6 +40,17 @@ void handleRoot()
 
   File file = SPIFFS.open(index_html, "r");
   server.streamFile(file, "text/html");
+  file.close();
+
+  SPIFFS.end();
+}
+
+void handleFavico()
+{
+  SPIFFS.begin();
+
+  File file = SPIFFS.open(favico, "r");
+  server.streamFile(file, "image/x-icon");
   file.close();
 
   SPIFFS.end();
@@ -122,38 +134,10 @@ void mqttReconnect()
   }
 }
 
-//flag for saving data
-bool shouldSaveConfig = false;
-
-//callback notifying us of the need to save config
-void saveConfigCallback()
-{
-  Serial.println("Should save config");
-  shouldSaveConfig = true;
-}
-
 void startWiFi()
 {
-  char no_of_leds[4]; // max uint8
-  char mqtt_port[6];  // max uint16
-
-  itoa(config.no_of_leds, no_of_leds, 10);
-  itoa(config.mqtt_port, mqtt_port, 10);
-
-  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", config.mqtt_server, sizeof(config.mqtt_server));
-  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, sizeof(mqtt_port));
-  WiFiManagerParameter custom_mqtt_username("username", "mqtt username", config.mqtt_username, sizeof(config.mqtt_username));
-  WiFiManagerParameter custom_mqtt_password("pwd", "mqtt pwd", config.mqtt_password, sizeof(config.mqtt_password));
-  WiFiManagerParameter custom_no_of_leds("leds", "no of leds", no_of_leds, sizeof(no_of_leds));
-
   WiFiManager wifiManager;
 
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
-  wifiManager.addParameter(&custom_mqtt_server);
-  wifiManager.addParameter(&custom_mqtt_port);
-  wifiManager.addParameter(&custom_mqtt_username);
-  wifiManager.addParameter(&custom_mqtt_password);
-  wifiManager.addParameter(&custom_no_of_leds);
   wifiManager.setConfigPortalTimeout(120);
   wifiManager.setTimeout(20);
 
@@ -166,26 +150,20 @@ void startWiFi()
   }
 
   Serial.println("Connected to Wifi");
-  strlcpy(config.mqtt_server, custom_mqtt_server.getValue(), sizeof(config.mqtt_server));
-  strlcpy(config.mqtt_server, custom_mqtt_server.getValue(), sizeof(config.mqtt_server));
-  strlcpy(config.mqtt_username, custom_mqtt_username.getValue(), sizeof(config.mqtt_username));
-  
-  config.mqtt_port = (uint16_t)atoi(custom_mqtt_port.getValue());
-  config.no_of_leds = (uint8_t)atoi(custom_no_of_leds.getValue());
 }
 
 bool isMQTTConfigured() 
 {
-  return config.mqtt_server && strlen(config.mqtt_server) > 0;
+  return mqtt_server && strlen(mqtt_server) > 0;
 }
 
 void startMQTT()
 {
   if (isMQTTConfigured())
   {
-    mqttClient.setServer(config.mqtt_server, config.mqtt_port);
+    mqttClient.setServer(mqtt_server, mqtt_port);
     mqttClient.setCallback(mqttCallback);
-    mqttClient.connect("neopixel", config.mqtt_username, config.mqtt_password);
+    mqttClient.connect("neopixel", mqtt_username, mqtt_password);
 
     mqttInUse = true;
   }
@@ -194,7 +172,7 @@ void startMQTT()
 void startOTA()
 {
   ArduinoOTA.setHostname(hostname);
-  ArduinoOTA.setPassword("esp8266");
+  ArduinoOTA.setPassword(ota_pwd);
 
   ArduinoOTA.onStart([]() {
     Serial.println("Start");
@@ -232,6 +210,7 @@ void startOTA()
 void startServer()
 {
   server.on("/", HTTP_GET, handleRoot);
+  server.on(favico, HTTP_GET, handleFavico);
   server.onNotFound(handleNotFound);
   server.begin();
 }
@@ -242,14 +221,9 @@ void startWebsocket()
   webSocket.onEvent(webSocketEvent); // if there's an incomming websocket message, go to function 'webSocketEvent'
 }
 
-void startMDNS()
-{
-  MDNS.begin(hostname);
-}
-
 void startLED()
 {
-  display_init(config.no_of_leds);
+  display_init();
 
   display_off();
 }
@@ -259,8 +233,6 @@ void setup()
   Serial.begin(115200);
   delay(10);
 
-  config_load();
-
   startLED();
 
   startWiFi();
@@ -268,7 +240,6 @@ void setup()
 
   startServer();
   startWebsocket();
-  startMDNS();
 }
 
 void loop()
@@ -281,7 +252,6 @@ void loop()
   }
 
   server.handleClient();
-  MDNS.update();
   webSocket.loop();
   ArduinoOTA.handle();
   
