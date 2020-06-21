@@ -4,9 +4,11 @@
 
 #include <NeoPixelBrightnessBus.h>
 
+#include "display.h"
+
 #pragma GCC diagnostic pop
 
-const uint16_t PixelCount = 8;
+const uint16_t PixelCount = 28;
 
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount);
 

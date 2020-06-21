@@ -8,7 +8,12 @@
 #include <PubSubClient.h>
 
 #include "display.h"
+#include "ntp_time.h"
 
+const char* hostname = "neopixel";
+const char* ota_pwd ="esp8266";
+
+/************* MQTT CONFIGURATION (if used, change these topics as you wish)  **************************/
 const char* mqtt_server = "";
 const int mqtt_port = 1883;
 const char* mqtt_username = NULL;
@@ -25,14 +30,13 @@ const char *color = "color";
 const char* index_html = "/index.html";
 const char* favico = "/favicon.ico";
 
-const char* hostname = "neopixel";
-const char* ota_pwd ="esp8266";
 
 WiFiClient wifi;
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
 PubSubClient mqttClient(wifi);
 bool mqttInUse = false;
+
 
 void handleRoot()
 {
@@ -43,6 +47,23 @@ void handleRoot()
   file.close();
 
   SPIFFS.end();
+}
+
+void handleTime() 
+{
+  static char* tm = (char*)"    ";
+
+  unsigned char h;
+  unsigned char m;
+
+  get_time(h, m);
+
+  tm[0] = '0' + h / 10;
+  tm[1] = '0' + h % 10;
+  tm[2] = '0' + m / 10;
+  tm[3] = '0' + m % 10;
+
+  server.send(200, "text/plain", tm);
 }
 
 void handleFavico()
@@ -210,6 +231,7 @@ void startOTA()
 void startServer()
 {
   server.on("/", HTTP_GET, handleRoot);
+  server.on("/tm", HTTP_GET, handleTime);
   server.on(favico, HTTP_GET, handleFavico);
   server.onNotFound(handleNotFound);
   server.begin();
@@ -238,6 +260,8 @@ void setup()
   startWiFi();
   startOTA();
 
+  ntp_time_init();
+
   startServer();
   startWebsocket();
 }
@@ -262,5 +286,17 @@ void loop()
       mqttReconnect();
     }
     mqttClient.loop();
+  }
+
+  if (millis() % 1000 == 0) {
+    ntp_time_update();
+
+    unsigned char hr;
+    unsigned char min;
+    get_time(hr, min);
+
+    if (hr == 2 && min == 38) {
+      display_set_color(0, 0, 0);
+    }
   }
 }
