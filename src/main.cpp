@@ -5,7 +5,10 @@
 #include <WebSocketsServer.h>
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
-#include <PubSubClient.h>
+
+#ifdef USE_MQTT
+  #include <PubSubClient.h>
+#endif
 
 #include "display.h"
 #include "ntp_time.h"
@@ -14,14 +17,16 @@ const char* hostname = "neopixel";
 const char* ota_pwd ="esp8266";
 
 /************* MQTT CONFIGURATION (if used, change these topics as you wish)  **************************/
-const char* mqtt_server = "";
-const int mqtt_port = 1883;
-const char* mqtt_username = NULL;
-const char* mqtt_password = NULL;
+#ifdef USE_MQTT
+  const char* mqtt_server = "";
+  const int mqtt_port = 1883;
+  const char* mqtt_username = NULL;
+  const char* mqtt_password = NULL;
 
 /************* MQTT TOPICS (change these topics as you wish)  **************************/
 const char *light_state_topic = "hs/neopixel";
 const char *light_set_topic = "hs/neopixel/set";
+#endif
 
 const char *on_cmd = "ON";
 const char *off_cmd = "OFF";
@@ -34,9 +39,11 @@ const char* favico = "/favicon.ico";
 WiFiClient wifi;
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
-PubSubClient mqttClient(wifi);
-bool mqttInUse = false;
 
+#ifdef USE_MQTT
+  PubSubClient mqttClient(wifi);
+  bool mqttInUse = false;
+#endif
 
 void handleRoot()
 {
@@ -122,38 +129,40 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
   }
 }
 
-void mqttCallback(char *topic, byte *payload, unsigned int length)
-{
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-}
-
-void mqttReconnect()
-{
-  // Loop until we're reconnected
-  while (!mqttClient.connected())
+#ifdef USE_MQTT
+  void mqttCallback(char *topic, byte *payload, unsigned int length)
   {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-    if (mqttClient.connect("ESP8266Client"))
+    Serial.print("Message arrived [");
+    Serial.print(topic);
+    Serial.print("] ");
+  }
+
+  void mqttReconnect()
+  {
+    // Loop until we're reconnected
+    while (!mqttClient.connected())
     {
-      Serial.println("connected");
-      // Once connected, publish an announcement...
-      mqttClient.publish(light_state_topic, "hello world");
-      // ... and resubscribe
-      mqttClient.subscribe(light_state_topic);
-    }
-    else
-    {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+      Serial.print("Attempting MQTT connection...");
+      // Attempt to connect
+      if (mqttClient.connect("ESP8266Client"))
+      {
+        Serial.println("connected");
+        // Once connected, publish an announcement...
+        mqttClient.publish(light_state_topic, "hello world");
+        // ... and resubscribe
+        mqttClient.subscribe(light_state_topic);
+      }
+      else
+      {
+        Serial.print("failed, rc=");
+        Serial.print(mqttClient.state());
+        Serial.println(" try again in 5 seconds");
+        // Wait 5 seconds before retrying
+        delay(5000);
+      }
     }
   }
-}
+#endif
 
 void startWiFi()
 {
@@ -173,22 +182,24 @@ void startWiFi()
   Serial.println("Connected to Wifi");
 }
 
-bool isMQTTConfigured() 
-{
-  return mqtt_server && strlen(mqtt_server) > 0;
-}
-
-void startMQTT()
-{
-  if (isMQTTConfigured())
+#ifdef USE_MQTT
+  bool isMQTTConfigured() 
   {
-    mqttClient.setServer(mqtt_server, mqtt_port);
-    mqttClient.setCallback(mqttCallback);
-    mqttClient.connect("neopixel", mqtt_username, mqtt_password);
-
-    mqttInUse = true;
+    return mqtt_server && strlen(mqtt_server) > 0;
   }
-}
+
+  void startMQTT()
+  {
+    if (isMQTTConfigured())
+    {
+      mqttClient.setServer(mqtt_server, mqtt_port);
+      mqttClient.setCallback(mqttCallback);
+      mqttClient.connect("neopixel", mqtt_username, mqtt_password);
+
+      mqttInUse = true;
+    }
+  }
+#endif
 
 void startOTA()
 {
@@ -279,6 +290,7 @@ void loop()
   webSocket.loop();
   ArduinoOTA.handle();
   
+  #ifdef USE_MQTT
   if (mqttInUse)
   {
     if (!mqttClient.connected())
@@ -287,6 +299,7 @@ void loop()
     }
     mqttClient.loop();
   }
+  #endif
 
   if (millis() % 1000 == 0) {
     ntp_time_update();
