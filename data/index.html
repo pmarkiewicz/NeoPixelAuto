@@ -185,6 +185,8 @@
                 connection.onclose = function (evt) { console.log(evt) };
                 connection.onmessage = function (evt) { console.log(evt) };
                 connection.onerror = function (evt) { console.log(evt) };
+
+                connection.send('?');
             }
         })();
     </script>

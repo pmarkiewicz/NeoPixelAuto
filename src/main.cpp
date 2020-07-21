@@ -35,10 +35,13 @@ const char *color = "color";
 const char* index_html = "/index.html";
 const char* favico = "/favicon.ico";
 
-
 WiFiClient wifi;
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
+
+static int r = 0;
+static int g = 0;
+static int b = 0;
 
 #ifdef USE_MQTT
   PubSubClient mqttClient(wifi);
@@ -91,15 +94,20 @@ void handleNotFound()
 
 void handleWSText(uint8_t num, uint8_t *payload)
 {
-  Serial.printf("[%u] get Text: %s\n", num, payload);
+  //Serial.printf("[%u] get Text: %s\n", num, payload);
   if (payload[0] == '#')
   {                                                                       // we get RGB data
       uint32_t rgb = (uint32_t)strtol((const char *)&payload[1], NULL, 16); // decode rgb data
-      int r = ((rgb >> 16) & 0xFF);                                        
-      int g = ((rgb >> 8) & 0xFF);                                       
-      int b = rgb & 0xFF;                                             
+      r = ((rgb >> 16) & 0xFF);                                        
+      g = ((rgb >> 8) & 0xFF);                                       
+      b = rgb & 0xFF;                                             
+  }
+  else if (payload[0] == '?')
+  {
+      char buf = "#000000";
 
-      display_set_color(r, g, b);
+      webSocket.sendTXT(num, "#000000"); 
+    // send(rgb);
   }
 }
 
@@ -108,23 +116,30 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
   switch (type)
   {
   case WStype_DISCONNECTED: // if the websocket is disconnected
-    Serial.printf("[%u] Disconnected!\n", num);
+    #ifdef _DEBUG
+      Serial.printf("[%u] Disconnected!\n", num);
+    #endif
     break;
   case WStype_ERROR:
-    Serial.printf("[%u] Error!\n", num);
+    #ifdef _DEBUG
+      Serial.printf("[%u] Error!\n", num);
+    #endif
     break;
   case WStype_CONNECTED:
-  { // if a new websocket connection is established
-    IPAddress ip = webSocket.remoteIP(num);
-    Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-    //rainbow = false; // Turn rainbow off when a new connection is established
-  }
-  break;
+      #ifdef _DEBUG
+      { // if a new websocket connection is established
+        IPAddress ip = webSocket.remoteIP(num);
+        Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+      }
+      #endif
+    break;
   case WStype_TEXT: // if new text data is received
     handleWSText(num, payload);
     break;
   default:
-    Serial.printf("Unknown WS command\n");
+    #ifdef _DEBUG
+      Serial.printf("Unknown WS command\n");
+    #endif
     break;
   }
 }
@@ -132,9 +147,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
 #ifdef USE_MQTT
   void mqttCallback(char *topic, byte *payload, unsigned int length)
   {
-    Serial.print("Message arrived [");
-    Serial.print(topic);
-    Serial.print("] ");
+    #ifdef _DEBUG
+      Serial.print("Message arrived [");
+      Serial.print(topic);
+      Serial.print("] ");
+    #endif
   }
 
   void mqttReconnect()
@@ -154,9 +171,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lenght)
       }
       else
       {
-        Serial.print("failed, rc=");
-        Serial.print(mqttClient.state());
-        Serial.println(" try again in 5 seconds");
+        #ifdef _DEBUG
+          Serial.print("failed, rc=");
+          Serial.print(mqttClient.state());
+          Serial.println(" try again in 5 seconds");
+        #endif
         // Wait 5 seconds before retrying
         delay(5000);
       }
@@ -179,7 +198,9 @@ void startWiFi()
     delay(5000);
   }
 
-  Serial.println("Connected to Wifi");
+  #ifdef _DEBUG
+    Serial.println("Connected to Wifi");
+  #endif
 }
 
 #ifdef USE_MQTT
@@ -207,33 +228,43 @@ void startOTA()
   ArduinoOTA.setPassword(ota_pwd);
 
   ArduinoOTA.onStart([]() {
-    Serial.println("Start");
+    #ifdef _DEBUG
+      Serial.println("Start");
+    #endif
     display_yellow();
   });
 
   ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
+    #ifdef _DEBUG
+      Serial.println("\nEnd");
+    #endif
     display_off();
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    #ifdef _DEBUG
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    #endif
+
     display_yellow();
   });
 
   ArduinoOTA.onError([](ota_error_t error) {
     display_red();
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR)
-      Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR)
-      Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR)
-      Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR)
-      Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR)
-      Serial.println("End Failed");
+
+    #ifdef _DEBUG
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR)
+        Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR)
+        Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR)
+        Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR)
+        Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR)
+        Serial.println("End Failed");
+    #endif
   });
 
   ArduinoOTA.begin();
@@ -263,7 +294,10 @@ void startLED()
 
 void setup()
 {
-  Serial.begin(115200);
+  #ifdef _DEBUG
+    Serial.begin(115200);
+  #endif
+
   delay(10);
 
   startLED();
@@ -307,9 +341,13 @@ void loop()
     unsigned char hr;
     unsigned char min;
     get_time(hr, min);
+  
+    display_set_color(r, g, b);
 
     if (hr == 2 && min == 38) {
-      display_set_color(0, 0, 0);
+      r = 0;
+      g = 0;
+      b = 0;
     }
   }
 }
